@@ -13,9 +13,9 @@ Briefly, this pipeline consists of three consecutive steps,
 
 
 ## Simulation commands
-These steps can be implemented either [separately](#Simulate with individual scripts) or [collectively](#Simulate with a single script) using the corresponding scripts provided. 
+These steps can be implemented either [separately](#Simulate-with-individual-scripts) or [collectively](#Simulate-with-a-single-script) using the corresponding scripts provided. 
 
-### Simulate with individual commands
+### Simulate-with-individual-commands
 As for the first step, a series of key parameters can be specified in the configuration files. These parameters include gene usage, allele ratio, the distribution of insertion and deletion length, and the percentage of productive rearrangements. 
 ```
 python Generate_Rearrangements.py
@@ -57,7 +57,7 @@ python Generate_Sequencing_Reads.py
 	-d out_dir  # output directory
 	-b basename  # basename for resulting ngs reads (pair-end)
 ```
-### Simulate with a single command
+### Simulate-with-a-single-command
 You can also implement all the individual steps needed for a complete simulation by a single command as below,
 ```
 python implants.py
