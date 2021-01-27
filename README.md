@@ -13,7 +13,7 @@ Briefly, this pipeline consists of three consecutive steps,
 
 
 ## Simulation commands
-These steps can be implemented either [separately](### Simulate with individual scripts) or [collectively](### Simulate with a single script) using the corresponding scripts provided. 
+These steps can be implemented either [separately](#Simulate with individual scripts) or [collectively](#Simulate with a single script) using the corresponding scripts provided. 
 
 ### Simulate with individual commands
 As for the first step, a series of key parameters can be specified in the configuration files. These parameters include gene usage, allele ratio, the distribution of insertion and deletion length, and the percentage of productive rearrangements. 
