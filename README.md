@@ -1,9 +1,9 @@
-#IMPlAntS
+##IMPlAntS
 
 Integrated and Modular Pipeline for Antibody Repertoire Simulation (IMPlAntS) simulates antibody heavy chain repertoire sequencing dataset according to serveral key features learned from a collection of 2152 high-quality Ig-seq dataset (refer to [https://doi.org/10.1101/814590](https://doi.org/10.1101/814590)). These features consist of germline gene usage, junctional modification, positional-specific somatic hypermutation and clonal expansion. 
 
 
-## Overview
+### Overview
 Briefly, this pipeline consists of three consecutive steps, 
 * Generation of independent rearrangements
 * Generation of SHM with phylogenetic structure within clones
@@ -12,10 +12,10 @@ Briefly, this pipeline consists of three consecutive steps,
 ![pipeline](image/pipeline.png)
 
 
-## Simulation
-These steps can be implemented either [separately](#Simulate with individual scripts) or [collectively](Simulate with a single script) using the corresponding scripts provided. 
+### Simulation
+These steps can be implemented either [separately](#### Simulate with individual scripts) or [collectively](#### Simulate with a single script) using the corresponding scripts provided. 
 
-### Simulate with individual scripts
+#### Simulate with individual scripts
 As for the first step, a series of key parameters can be specified in the configuration files. These parameters include gene usage, allele ratio, the distribution of insertion and deletion length, and the percentage of productive rearrangements. 
 ```
 python Generate_Rearrangements.py
@@ -57,7 +57,7 @@ python Generate_Sequencing_Reads.py
 	-d out_dir  # output directory
 	-b basename  # basename for resulting ngs reads (pair-end)
 ```
-### Simulate with a single script
+#### Simulate with a single script
 
 ```
 python implants.py
