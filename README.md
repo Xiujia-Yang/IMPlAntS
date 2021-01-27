@@ -1,4 +1,4 @@
-##IMPlAntS
+## IMPlAntS
 
 Integrated and Modular Pipeline for Antibody Repertoire Simulation (IMPlAntS) simulates antibody heavy chain repertoire sequencing dataset according to serveral key features learned from a collection of 2152 high-quality Ig-seq dataset (refer to [https://doi.org/10.1101/814590](https://doi.org/10.1101/814590)). These features consist of germline gene usage, junctional modification, positional-specific somatic hypermutation and clonal expansion. 
 
