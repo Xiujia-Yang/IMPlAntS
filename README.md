@@ -52,7 +52,7 @@ Subcommands:
     repsim    De novel simulate antibody heavy chain repertoire dataset
 
 Other:
-    -h        Print this message.
+    -h        Print this message
         
 ```
 
@@ -218,7 +218,7 @@ usage: shmsim [-h] [-m MUT] [-p SUB] [-f MUT_ABILITY_FOLD] [-T TIMES]
               [-t TOPNUM] [-ne NMAX] [-oc OUTPUTC] [-i INPUT] [-d DIR]
               [-s SEED]
 
-shmsim simuates clonally expanded sequences with phylogenetical SHM structure.
+shmsim simuates clonally expanded sequences with phylogenetical SHM structure
 
 optional arguments:
   -h, --help            show this help message and exit
