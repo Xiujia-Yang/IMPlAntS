@@ -1,6 +1,6 @@
 # IMPlAntS
 
-**IMPlAntS** (***I***ntegrated and ***M***odular ***P***ipe***l***ine for ***Ant***ibody Repertoire ***S***imulation) simulates antibody heavy chain repertoire sequencing dataset according to serveral key features learned from a collection of 2152 high-quality Ig-seq dataset (refer to [https://doi.org/10.1101/814590](https://doi.org/10.1101/814590)). These features consist of germline gene usage, junctional modification, positional-specific somatic hypermutation and clonal expansion. 
+**IMPlAntS** (***I***ntegrated and ***M***odular ***P***ipe***l***ine for ***Ant***ibody Repertoire ***S***imulation) simulates antibody heavy chain repertoire sequencing dataset according to serveral key features learned from a collection of 2152 high-quality Ig-seq dataset (refer to [https://doi.org/10.1016/j.celrep.2021.109110](https://doi.org/10.1016/j.celrep.2021.109110)). These features consist of germline gene usage, junctional modification, positional-specific somatic hypermutation and clonal expansion. 
 
 
 ## Table of contents
