@@ -16,11 +16,11 @@
 
 
 ## Dependencies
-IMPlAntS is totally developped based on Python. The pipeline was tested successfully with both Python 2.7.14 and Python 3.7.4. Besides, two additional modules, `pandas` and `Bio `, are required and they can be installed using `pip` on the commandline (e.g. `pip install pandas biopython`).
+**IMPlAntS** is totally developped based on Python. The pipeline was tested successfully with both Python 2.7.14 and Python 3.7.4. Besides, two additional modules, `pandas` and `Bio `, are required and they can be installed using `pip` on the commandline (e.g. `pip install pandas biopython`).
 
 
 ## Initialization
-In Linux OS, users can add the main directory into the environment variable, `PATH`, to enable free calling IMPlAntS utilities. The following is an example.
+In Linux OS, users can add the main directory into the environment variable, `PATH`, to enable free calling **IMPlAntS** utilities. The following is an example.
 
 ```
 export PATH=/path/to/IMPlAntS-main:$PATH
@@ -32,7 +32,29 @@ export PATH=/path/to/IMPlAntS-main:$PATH
 
 
 ## Simulation pipeline
-The simulation pipeline can be implemented either [separately](#modular-simulation) or [collectively](#one-stop-simulation) using corresponding IMPlAantS' subcommands. 
+The simulation pipeline can be implemented either [collectively](#one-stop-simulation) or [separately](#modular-simulation) using corresponding IMPlAantS' subcommands. 
+```
+.___    _____  __________ .__      _____            __    _________
+|   |  /     \ \______   \|  |    /  _  \    ____ _/  |_ /   _____/
+|   | /  \ /  \ |     ___/|  |   /  /_\  \  /    \\   __\\_____  \ 
+|   |/    Y    \|    |    |  |__/    |    \|   |  \|  |  /        \
+|___|\____|__  /|____|    |____/\____|__  /|___|  /|__| /_______  /
+             \/                         \/      \/              \/ 
+IMPlAnts (Integrated and Modular Pipeline for Antibody Repertoire 
+Simulation) simulates antibody heavy chain repertoire sequencing dataset 
+according to serveral key features learned from a collection of 2152 
+high-quality Ig-seq dataset.
+
+Subcommands:
+    ramsim    Simulate independent rearranged V(D)J sequences
+    shmsim    Simulate clonally expanded sequences with phylogenetic SHMs
+    ngssim    Simulate NGS reads via ART
+    repsim    De novel simulate antibody heavy chain repertoire dataset
+
+Other:
+    -h        Print this message.
+        
+```
 
 ### One-stop simulation
 You can also implement all the individual steps needed for a complete simulation by a single command as below,
