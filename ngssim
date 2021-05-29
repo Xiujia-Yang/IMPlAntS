@@ -1,0 +1,62 @@
+#!/bin/env python
+# -*- coding: utf-8 -*-
+
+
+import sys
+import argparse
+import subprocess
+import time
+
+
+def main():
+    ## Run ART to simulate NGS reads
+    art_cmd = "%s -ss MSv3 \
+                        -i %s \
+                        -o %s \
+                        -l 250 \
+                        -f 4 \
+                        -p \
+                        -m 500 \
+                        -s 10 \
+                        -na \
+                        -rs %d \
+                        "%(artPath, inf, basename, seed_value)
+    
+    subprocess.call(art_cmd, shell=True)
+
+
+if __name__ == "__main__":
+    ## Specify the default value
+    scriptDir = sys.path[0]
+    artDefault="%s/art_illumina"%scriptDir
+    iDefault = 'clonally_expanded_sequences.fasta'
+    oDefault = 'illumina.sequencing.reads'
+    dtime = int(time.strftime("%Y%m%d", time.localtime()))
+    
+    ## define the argument parser module
+    parser = argparse.ArgumentParser(description='''ngssim simulates next
+    generation sequencing reads via ART''')
+    parser.add_argument("-art", "--art_path", type=str, default=artDefault, \
+                help="Path to ART executable")
+    parser.add_argument("-i", "--input", type=str, default=iDefault, \
+                help="Path to input fasta file")
+    parser.add_argument("-d", "--dir", type=str, default="./", \
+                help="Path to output directory")
+    parser.add_argument("-b", "--basename", type=str, default=oDefault, \
+                help="basename for output")
+    parser.add_argument("-s", "--seed", type=int, default=dtime, \
+                help="Seed used for generating random value")
+    args = parser.parse_args()
+    artPath = args.art_path
+    inf = args.input
+    basename = args.basename
+    dirt = args.dir
+    seed_value = args.seed
+    
+    ## Prompt message
+    print (''' +-++-++-++-++-++-+
+|n||g||s||s||i||m|
++-++-++-++-++-++-+
+''')
+    ## Run main function
+    main()

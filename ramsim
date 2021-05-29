@@ -1,0 +1,296 @@
+#!/bin/env python
+# -*- coding: utf-8 -*-
+
+
+import csv, sys
+import argparse
+import pandas as pd
+from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.Alphabet import generic_dna
+import argparse
+from random import random
+from random import randint
+from random import seed
+import time
+
+
+def random_gene(freq_dict):
+    '''
+        This function is to obtain the random
+        selected gene.
+    '''
+    rand = random()
+    pos = 0
+    for gene, freq in sorted(freq_dict.items(), key=lambda x:x[1]):
+        pos += freq
+        if rand*100 < pos:
+            break
+    return gene
+    
+def seq_mod(freq_dict, seq, flag, end):
+    '''
+        This function is to obtain the randomly
+        modified sequences.
+    '''
+    rand = random()
+    pos = 0
+    for l, freq in sorted(freq_dict.items(), key=lambda x:x[1], reverse=True):
+        l = int(l)
+        pos += freq
+        if rand*100 < pos:
+            break
+    
+    if l == 0:
+        return [seq, 0, 0]
+    else:
+        if end == 3:
+            return [seq[:-l], 0, l] if flag == '-' else [seq+str(Seq(seq[-l:], generic_dna).reverse_complement()), l, 0]
+        else:
+            return [seq[l:], 0, l] if flag == '-' else [str(Seq(seq[:l], generic_dna).reverse_complement())+seq, l, 0]
+
+def N_seq(freq_dict):
+    '''
+        This function is to obtain the random 
+        sequence of N nucleotide.
+    '''
+    n_dict = {0:'A', 1:'T', 2:'C', 3:'G'}
+    rand = random()
+    pos = 0
+    for l, freq in sorted(freq_dict.items(), key=lambda x:x[1], reverse=True):
+        l = int(l)
+        pos += freq
+        if rand*100 < pos:
+            break
+    return ["".join([n_dict[randint(0,3)] for x in range(l)]), l]
+
+def random_prod():
+    '''
+        Get a random productivity
+    '''
+    return "Productive" if random() <= float(pp)/100 else "Unproductive"
+
+
+def status(seq, vloci, jloci, jpos, j5dLen):
+    '''
+        Determine the productivity of rearranged sequences
+    '''
+    vOffset = vloci%3
+    jOffset = jpos%3
+    endOffset = len(seq[vOffset:])%3
+    if endOffset != 0:
+        aaSeq = Seq(seq[vOffset:-endOffset], generic_dna).translate()
+    else:
+        aaSeq = Seq(seq[vOffset:], generic_dna).translate()
+    if "*" not in aaSeq and aaSeq[int(vloci/3)] == "C" and j5dLen < jloci-2 and vOffset == jOffset:
+        return "Productive"
+    else:
+        return "Unproductive"
+    
+def timenow():
+    '''
+        Obtain current time
+    '''
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+
+def main():
+    ## Import the IMGT reference
+    refseq_dict = {}
+    for ref in [vRef, dRef, jRef]:
+        for rec in SeqIO.parse(ref, "fasta"):
+            refseq_dict.update({rec.id:str(rec.seq)})
+    
+    ## Import the simulation parameters
+    param_dict = {'vu':{}, 'ju':{}, 'du':{},
+                 'v3p':{}, 'd5p':{}, 'd3p':{}, 'j5p':{},
+                 'v3d':{}, 'd5d':{}, 'd3d':{}, 'j5d':{},
+                 'n1':{}, 'n2':{}}
+    for name, path in zip(['du', 'v3p', 'd5p', 'd3p', 'j5p', 'v3d', 'd5d', 'd3d', 'j5d', 'n1', 'n2'],
+        [du, v3p, d5p, d3p, j5p, v3d, d5d, d3d, j5d, n1, n2]):
+        df = pd.read_csv(path, sep='\t', header=None, index_col=0)
+        param_dict[name] = df.iloc[:,0].to_dict()
+    ## Import the simulation parameter for V allele (since it is genotyped)
+    vuHandle = csv.reader(open(vu, "r"), delimiter="\t")
+    juHandle = csv.reader(open(ju, "r"), delimiter="\t")
+    param_dict.update({"vloci":{}}); param_dict.update({"jloci":{}})
+    for gene, usage, loci, geno, ratio in vuHandle:
+        if "," not in geno:
+            param_dict["vu"].update({gene+"*"+geno:float(usage)})
+            param_dict["vloci"].update({gene+"*"+geno:int(loci)})
+        else:
+            geno1, geno2 = geno.split(",")
+            ratio1, ratio2 = map(float, ratio.split(","))
+            loci1, loci2 = map(int, loci.split(","))
+            param_dict["vu"].update({gene+"*"+geno1:float(usage)*ratio1})
+            param_dict["vu"].update({gene+"*"+geno2:float(usage)*ratio2})
+            param_dict["vloci"].update({gene+"*"+geno1:int(loci1)})
+            param_dict["vloci"].update({gene+"*"+geno2:int(loci2)})
+    for gene, usage, loci in juHandle:
+        param_dict["ju"].update({gene:float(usage)})
+        param_dict["jloci"].update({gene:int(loci)})
+        
+    ## In-silico simulation pipeline
+    titleDict = {}  # define a title dictionary to avoid redundant rearrangements
+    # Iterate n times to generate n rearrangements
+    for n in range(N):
+        ## Prompt message
+        if n%1000 == 0:
+            print ("[%s] %d (%.2f%%) sequences were rearranged already... "%(timenow(), n, float(n)/float(N)*100))
+        
+        # Determine the productivity of the rearrangement in this simulation
+        pStatus = random_prod()
+        
+        while True:
+            ## This code module produce rearranged sequence
+            # Obtain the rearranged v, d and j gene
+            v_gene = random_gene(param_dict['vu']); vSeq = refseq_dict[v_gene]
+            d_gene = random_gene(param_dict['du']); dSeq = refseq_dict[d_gene]
+            j_gene = random_gene(param_dict['ju']); jSeq = refseq_dict[j_gene]
+            # Obtain the sequences of v and j segment
+            vSeqMod, v3pLen, v3dLen = seq_mod(param_dict['v3p'], vSeq, '+', 3) if random() > v3r else seq_mod(param_dict['v3d'], vSeq, '-', 3)
+            jSeqMod, j5pLen, j5dLen = seq_mod(param_dict['j5p'], jSeq, '+', 5) if random() > j5r else seq_mod(param_dict['j5d'], jSeq, '-', 5)
+            # Obtain the sequence of d segment
+            while True:
+                dSeqMod, d5pLen, d5dLen = seq_mod(param_dict['d5p'], dSeq, '+', 5) if random() > d5r else seq_mod(param_dict['d5d'], dSeq, '-', 5)
+                dSeqMod, d3pLen, d3dLen = seq_mod(param_dict['d3p'], dSeqMod, '+', 3) if random() > d3r else seq_mod(param_dict['d3d'], dSeqMod, '-', 3)
+                if d5dLen + d3dLen < len(dSeq):
+                    break
+            # Obtain the sequence of N1 and N2
+            n1Seq, n1Len = N_seq(param_dict['n1'])
+            n2Seq, n2Len = N_seq(param_dict['n2'])
+            # Obtain the raw rearranged sequences
+            rawRearrSeq = vSeqMod + n1Seq + dSeqMod + n2Seq + jSeqMod
+        
+            ## Obtain the productivity status and break if the status 
+            ## of rearranged sequence agrees with the predetermined status
+            vloci = param_dict["vloci"][v_gene]
+            jloci = param_dict["jloci"][j_gene]
+            jpos = len(vSeqMod+n1Seq+dSeqMod+n2Seq) + (jloci+j5pLen-j5dLen)
+            if not status(rawRearrSeq, vloci, jloci, jpos, j5dLen) == pStatus:
+                continue
+            
+            # Generate read title (ID) and determine if it is duplicated
+            n1Start = len(vSeqMod)
+            dStart = len(vSeqMod + n1Seq)
+            n2Start = len(vSeqMod + n1Seq + dSeqMod)
+            jStart = len(vSeqMod + n1Seq + dSeqMod + n2Seq)
+            title = '>'+":".join(map(str,[v_gene, d_gene, j_gene, 
+                                          v3pLen, d5pLen, d3pLen, j5pLen, 
+                                          v3dLen, d5dLen, d3dLen, j5dLen, 
+                                          n1Len, n2Len, n1Seq, n2Seq, 
+                                          n1Start, dStart, n2Start, jStart,
+                                          pStatus]))+'\n'
+            if title not in titleDict.keys():
+                titleDict.update({title: 0})
+                break
+                
+        # Write the result
+        f.write(title+rawRearrSeq+'\n')
+    
+    # Prompt message
+    print ("\n[%s] ramsim finished!"%timenow())
+    print ("Rearranged sequences can be found in %s/%s"%(dirt.strip("/"), output))
+
+
+if __name__ == "__main__":
+    ## Specify the parameter directory
+    scriptDir = sys.path[0]
+    parDir = "%s/param_files/"%scriptDir
+    
+    ## Specify the default value
+    vRefDefault = parDir+'human_IGHV';dRefDefault = parDir+'human_IGHD';jRefDefault = parDir+'human_IGHJ'
+    vDefault = parDir+'vu.geno.05.txt';dDefault = parDir+'du.txt';jDefault = parDir+'ju.add.loci.txt'
+    v3dDefault = parDir+'V3D.txt';d5dDefault = parDir+'D5D.txt'
+    d3dDefault = parDir+'D3D.txt';j5dDefault = parDir+'J5D.txt'
+    v3pDefault = parDir+'V3P.txt';d5pDefault = parDir+'D5P.txt'
+    d3pDefault = parDir+'D3P.txt';j5pDefault = parDir+'J5P.txt'
+    n1Default = parDir+'N1.txt';n2Default = parDir+'N2.txt'
+    dtime = int(time.strftime("%Y%m%d", time.localtime()))
+    
+    ## define the argument parser module
+    parser = argparse.ArgumentParser(description='''ramsim simulates
+    independent rearranged V(D)J sequences''')
+    parser.add_argument("-vu", "--v_usage_file", type=str, default=vDefault, \
+                help="Path to V allele usage statistics")
+    parser.add_argument("-du", "--d_usage_file", type=str, default=dDefault, \
+                help="Path to D allele usage statistics")
+    parser.add_argument("-ju", "--j_usage_file", type=str, default=jDefault, \
+                help="Path to J allele usage statistics")
+    parser.add_argument("-vr", "--v_reference", type=str, default=vRefDefault, \
+                help="Path to V allele reference sequence")
+    parser.add_argument("-dr", "--d_reference", type=str, default=dRefDefault, \
+                help="Path to D allele reference sequence")
+    parser.add_argument("-jr", "--j_reference", type=str, default=jRefDefault, \
+                help="Path to J  allele reference sequence")
+    parser.add_argument("-v3d", "--V3D", type=str, default=v3dDefault, \
+                help="Path to junctional modification v3d statistics")
+    parser.add_argument("-d5d", "--D5D", type=str, default=d5dDefault, \
+                help="Path to junctional modification d5d statistics")
+    parser.add_argument("-d3d", "--D3D", type=str, default=d3dDefault, \
+                help="Path to junctional modification d3d statistics")
+    parser.add_argument("-j5d", "--J5D", type=str, default=j5dDefault, \
+                help="Path to junctional modification j5d statistics")
+    parser.add_argument("-v3p", "--V3P", type=str, default=v3pDefault, \
+                help="Path to junctional modification v3d statistics")
+    parser.add_argument("-d5p", "--D5P", type=str, default=d5pDefault, \
+                help="Path to junctional modification d5d statistics")
+    parser.add_argument("-d3p", "--D3P", type=str, default=d3pDefault, \
+                help="Path to junctional modification d3d statistics")
+    parser.add_argument("-j5p", "--J5P", type=str, default=j5pDefault, \
+                help="Path to junctional modification j5d statistics")
+    parser.add_argument("-n1", "--N1", type=str, default=n1Default, \
+                help="Path to junctional modification d3d statistics")
+    parser.add_argument("-n2", "--N2", type=str, default=n2Default, \
+                help="Path to junctional modification j5d statistics")
+    parser.add_argument("-v3Odd", "--V3ODD", type=float, default=0.561437, \
+                help="Ratio of deletion events in V3")
+    parser.add_argument("-d5Odd", "--D5ODD", type=float, default=0.828560, \
+                help="Ratio of deletion events in D5")
+    parser.add_argument("-d3Odd", "--D3ODD", type=float, default=0.816268, \
+                help="Ratio of deletion events in D3")
+    parser.add_argument("-j5Odd", "--J5ODD", type=float, default=0.817500, \
+                help="Ratio of deletion events in J5")
+    parser.add_argument("-n", "--n_rearrangements", type=int, default=5000, \
+                help="Number of independent rearrangements to be simulated")
+    parser.add_argument("-pp", "--pct_prod", type=float, default=100, \
+                help="Percentage of productive rearrangements")
+    parser.add_argument("-d", "--dir", type=str, default="./", \
+                help="Path to the output directory")
+    parser.add_argument("-o", "--output", type=str, default="raw_rearranged_sequences.fasta", \
+                help="Output fasta file of independent rearranged sequences")
+    parser.add_argument("-s", "--seed", type=int, default=dtime, \
+                help="Seed used for generating random values")
+    args = parser.parse_args()
+    vu = args.v_usage_file; du = args.d_usage_file; ju = args.j_usage_file
+    vRef = args.v_reference; dRef = args.d_reference; jRef = args.j_reference
+    v3p = args.V3P; d5p = args.D5P; d3p = args.D3P; j5p = args.J5P
+    v3d = args.V3D; d5d = args.D5D; d3d = args.D3D; j5d = args.J5D
+    n1 = args.N1; n2 = args.N2
+    v3r = args.V3ODD; d5r = args.D5ODD; d3r = args.D3ODD; j5r = args.J5ODD
+    pp = args.pct_prod
+    N = args.n_rearrangements; output = args.output; dirt = args.dir
+    seed_value = args.seed
+    
+    ## Set the random seed for obtaining the same results
+    seed(seed_value)
+    
+    ## Write the results
+    f = open(dirt+'/'+output, "w")
+    
+    # Prompt message
+    print (''' +-++-++-++-++-++-+
+ |r||a||m||s||i||m|
+ +-++-++-++-++-++-+
+           ''')
+    print ("[%s] ramsim starting...\n\n"%timenow())
+    print ("The parameters employed are as follows:\n")
+    print ("%40s\t%s"%("Parameter", "Value"))
+    print ("%40s\t%d"%("Number of rearranged sequences", N))
+    print ("%40s\t%.2f"%("Percent of productive rearrangements", pp))
+    print ("%40s\t%s"%("Output directory", dirt))
+    print ("%40s\t%s"%("Output fasta file", output))
+    print ("%40s\t%s\n\n"%("Seed", seed_value))
+    
+    ## Run main function
+    main()

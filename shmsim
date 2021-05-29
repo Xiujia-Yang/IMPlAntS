@@ -1,0 +1,439 @@
+#!/bin/env python
+# -*- coding: utf-8 -*-
+
+
+'''
+    This script is for generating SHM based on model learned 
+    from Resource dataset for in-silico simulated sequences.
+    
+    The procedure is similar to AbSims, which undergone several
+    rounds of evolution (SHM). Note that in each round the mutated
+    loci will not undergo further mutation. This will lead to 
+    over-mutated sequences if the original mutability for each site
+    was not down-regulated, because the mutability is obtained from IgG
+    repertoires that have undergone several rounds of SHM.
+    
+    Written by Xiujia Yang, on Sep 21, 2020
+'''
+
+
+import os, glob, sys
+import subprocess, time
+import pandas as pd
+from Bio import SeqIO
+import argparse
+from random import random
+from random import seed
+from random import shuffle
+
+
+def dist_cal(seq1, seq2):
+    '''
+        This function is to calculate the distance between
+        two aligned sequences.
+    '''
+    n = 0
+    diff_pos_lst = []  # pos is based on non-gapped sequences and is 0-based
+    for i, (c1, c2) in enumerate(zip(seq1, seq2)):
+        if c1 != c2:
+            n += 1
+            diff_pos_lst.append(((i - seq1[:i].count("."), i - seq2[:i].count("."))))
+    return [n, diff_pos_lst]
+
+def shm(seq, allele, start, end, mut_tag, offset, df_mut, df_sub):
+    '''
+        This function is for giving the mutated sequence.
+        seq: the sequence subject to shm
+        allele: allele id
+        start: 0-based start index, inclusive
+        end: 0-based end index, exclusive
+        
+        it returns an mutation tag and mutated sequences
+    '''
+    mut_loci_lst = [ int(x[1:-1])-offset for x in mut_tag ]
+    seq_lst = [x for x in seq]
+    mut_lst = df_mut.loc[range(start, end), allele].tolist()
+    
+    for i, from_nuc, mutability in zip(range(start, end), seq, mut_lst):
+        if i in mut_loci_lst:
+            continue
+        rand = random()  # determine if this position is mutated
+        if rand < mutability:
+            rand = random()  # determine the target nucleotide
+            level = 0   # accumulator
+            #for nuc in ["A", "C", "G", "T"]:
+            for nuc, j in zip(["A", "C", "G", "T"], [0, 1, 2, 3]):
+                level += df_sub[allele][i][j]
+                if rand < level:
+                    to_nuc = nuc
+                    seq_lst[i-start] = to_nuc
+                    break
+            mut_tag.append(from_nuc+str(i+offset)+to_nuc)
+    return (mut_tag, "".join(seq_lst))
+
+def timenow():
+    '''
+        Obtain current time
+    '''
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+
+
+def main():
+    ## Import the IMGT reference
+    seq_dict = {}
+    len_dict = {}
+    for ref in [vRef, dRef, jRef]:
+        for rec in SeqIO.parse(ref, "fasta"):
+            seq_dict.update({rec.id:str(rec.seq)})
+            len_dict.update({rec.id:len(rec.seq)})
+    
+    
+    ## Import the model parameters learned from resource dataset
+    # Import the mutability model
+    df_mut = pd.read_csv(mut_model_file, sep="\t", index_col=0)
+    # scale the mutability according to the -f parameter specified by user
+    df_mut = df_mut / 7.44 * fold  # 7.44 is the original mutation rate
+    # Import the substitution model
+    df_sub = {}
+    model_lst = glob.glob(r"%s/*.sub.txt"%shm_model_dir)
+    for model in model_lst:
+        allele = "/OR".join(("*".join(os.path.basename(model).split(".sub.")[0].split(".")).split("-OR")))
+        df_sub.update({allele:pd.read_csv(model, index_col=0).fillna(0).to_numpy()})
+    
+    
+    ## Handling with the exceptions that can occur when no available 
+    ## mutability and substitution model for rearranged alleles.
+    ## 1. The allele set should be exactly the same between mutability
+    ## and substitution model, since that if one allele has its mutability
+    ## model we can also at the same time calculate its substitution model.
+    ## 2. The shm model for unavailable allele will be replaced by the model
+    ## of the allele nearest to it. For the polymorphic sites, the substitution
+    ## model will be same for the two common target nucleotides
+
+    ######################################################################
+    ####             Model Replacement Explanation
+    ######################################################################
+    ## Allele A: [A] to [C, G, T]
+    ## Allele B: [C] to [A, G, T]
+    ## Thus the two common target nucleotides is [G, T],
+    ## Thus substitution preference for inconsistent target nucleotide 
+    ## for allele B [A] will simply be replaced by that for [C] for allele A.
+    
+    ################### Complete the IGHV alleles models ###################
+    ## Step1: Obtain the unavailable allele list
+    a_allele_lst = [ x for x in df_mut.columns if x.startswith("IGHV")]
+    df_vu = pd.read_csv(vu_fl, sep="\t", header=None, names=["gene", "usage", "cysLoci", "geno", "Prop"], dtype={"geno":'str'})
+    vAlleleLst = (df_vu.loc[:,"gene"] + "*" + df_vu.loc[:,"geno"]).tolist()
+    u_allele_lst = list(set(vAlleleLst) - set(df_mut.columns))
+    ## Step2: Obtain the nearest allele for each allele
+    gap_seq_dict = {}   # key: allele id, Value: allele gapped seq
+    for rec in SeqIO.parse(vGappedRef, "fasta"):
+        Id = rec.id.split("|")[1]
+        gap_seq_dict.update({Id: str(rec.seq)})
+    dist_dict = {}  # {"IGHV3-20*04.IGHV1-69*01": distance}
+    pos_lst_dict = {}  # {"IGHV3-20*04.IGHV1-69*01": [0, ]}
+    min_dist_dict = {}  # key being allele id, value being allele id nearest to key
+    for allele1 in u_allele_lst:
+        dist = 1000  # set an impossible distance value for initializing
+        for allele2 in a_allele_lst:
+            seq1 = gap_seq_dict[allele1]
+            seq2 = gap_seq_dict[allele2]
+            distance, diff_pos_lst = dist_cal(seq1, seq2)
+            dist_dict.update({".".join([allele1,allele2]):distance})
+            pos_lst_dict.update({".".join([allele1,allele2]):diff_pos_lst})
+            if distance < dist:
+                dist = distance
+                min_dist_dict.update({allele1:allele2})
+    ## Step3: Report the unavailable allele, the replacing allele and the distance
+    ## between them, and then add the models for unavailable alleles
+    for allele in u_allele_lst:
+        alt_allele = min_dist_dict[allele]
+        distance = dist_dict[".".join([allele, alt_allele])]
+        pos_lst = pos_lst_dict[".".join([allele, alt_allele])]
+        print ('''
+            %s was not found in the model! 
+            %s's model were selected to represent its model, which is
+            %d bp distance to %s.
+            '''%(allele, alt_allele, distance, allele))
+        # add the substitution model
+        df_sub.update({allele:df_sub[alt_allele]})
+        # add the mutability model
+        df_mut[allele]=df_mut[alt_allele]
+        # modify the polymorphic site to make it perfectly suits the germline
+        num_nuc_dict = dict(zip(["A", "C", "G", "T"], [0, 1, 2, 3]))
+        for i, j in pos_lst:
+            #print (allele, j, seq_dict[allele][j])
+            germ_allele = num_nuc_dict[seq_dict[allele][j]]
+            germ_alt_allele = num_nuc_dict[seq_dict[alt_allele][i]]
+            # replace the inconsistent nucleotide in allele with the that in the alternate allele
+            df_sub[allele][j][germ_alt_allele] = df_sub[allele][j][germ_allele]  
+            # set the from nucleotide the 0 value
+            df_sub[allele][j][germ_allele] = 0  
+    
+    ################### Complete the IGHD alleles models ###################
+    ## Step1: Obtain the unavailable allele list
+    a_allele_lst = [ x for x in df_mut.columns if x.startswith("IGHD")]
+    df_du = pd.read_csv(du_fl, sep="\t", header=None, index_col=0, names=["usage"])
+    u_allele_lst = list(set(df_du.index.tolist()) - set(df_mut.columns))
+    ## Step2: Obtain the nearest allele for each allele
+    gap_seq_dict = {}   # key: allele id, Value: allele gapped seq
+    for rec in SeqIO.parse(dGappedRef, "fasta"):
+        Id = rec.id.split("|")[1]
+        gap_seq_dict.update({Id: str(rec.seq)})
+    n_allele = len(gap_seq_dict.keys())
+    allele_lst = gap_seq_dict.keys()
+    dist_dict = {}
+    pos_lst_dict = {}
+    min_dist_dict = {}  # key being allele id, value being allele id nearest to key
+    for allele1 in u_allele_lst:
+        dist = 1000
+        for allele2 in a_allele_lst:
+            seq1 = gap_seq_dict[allele1]
+            seq2 = gap_seq_dict[allele2]
+            distance, diff_pos_lst = dist_cal(seq1, seq2)
+            dist_dict.update({".".join([allele1,allele2]):distance})
+            pos_lst_dict.update({".".join([allele1,allele2]):diff_pos_lst})
+            if distance < dist:
+                dist = distance
+                min_dist_dict.update({allele1:allele2})
+    ## Step3: Report the unavailable allele, the replacing allele and the distance
+    ## between them, and then add the models for unavailable alleles
+    for allele in u_allele_lst:
+        # obtain the nearest allele
+        alt_allele = min_dist_dict[allele]
+        distance = dist_dict[".".join([allele, alt_allele])]
+        pos_lst = pos_lst_dict[".".join([allele, alt_allele])]
+        print ('''
+            %s was not found in the model! 
+            %s's model were selected to represent its model, which is
+            %d bp distance to %s.
+            '''%(allele, alt_allele, distance, allele))
+        # add the substitution model
+        df_sub.update({allele:df_sub[alt_allele]})
+        # add the mutability model
+        df_mut[allele]=df_mut[alt_allele]
+        # Modify the polymorphic site to make it consistent with the germline
+        num_nuc_dict = dict(zip(["A", "C", "G", "T"], [0, 1, 2, 3]))
+        for i, j in pos_lst:
+            #print (allele, j, seq_dict[allele][j])
+            germ_allele = num_nuc_dict[seq_dict[allele][j]]
+            germ_alt_allele = num_nuc_dict[seq_dict[alt_allele][i]]
+            # replace the inconsistent nucleotide in allele with the that in the alternate allele
+            df_sub[allele][j][germ_alt_allele] = df_sub[allele][j][germ_allele]  
+            # set the from nucleotide the 0 value
+            df_sub[allele][j][germ_allele] = 0  
+    
+    ## Read the original recombined sequences and stored them
+    ## in a dictionary for later iteration
+    seqDict = {}  # with keys being the read id and value being a list
+    # recording both the sequences and mutation tag. Each read id will be
+    # appended with a counter to indicate this copy's order. 0 represents the
+    # original sequences and 1 represents the first copy. Therefore an item
+    # in the dictionary will look like,
+    # {"IGHV3-23*01:IGHD5-18*01:IGHJ5*02:0:0:0:4:1:3:7:0:1:0:A::295:296:306:306:Productive:Copy1003":
+    # ["GAGGT....TCTCCTCAG", [[v_mut_tag], [d_mut_tag], [j_mut_tag]]]}
+    # Noted that this method will deduplicate the original sequence. However,
+    # it is quite rare to generated two exactly same recombined sequences.
+    seqDictCount = {}  # The dictionary is for recording the count of the copies of original sequences
+    
+    for rec in SeqIO.parse(input_fasta, "fasta"):
+        seqDict.update({"%s:index_%d:T_%d"%(str(rec.id), 0, 0):[str(rec.seq), [[], [], []]]})
+        seqDictCount.update({str(rec.id):0})
+        
+    nEvolTimes = 0; nSeq = len(seqDict)
+    while nEvolTimes < EVOL_TIMES and nSeq <= MAX_SEQ:
+        # Prompt message
+        print ("[%s] Evolution time: (%d/%d) | Number of starting sequences: %d"%(timenow(), nEvolTimes+1, EVOL_TIMES, len(seqDict)))
+        
+        for seqId, [seq, [v_mut_tag, d_mut_tag, j_mut_tag]] in list(seqDict.items()):
+            rand = random()
+            if rand <= SHM_PROPORTION:
+                # Accumulator for count
+                originalSeqId = ":".join(seqId.split(":")[:-2])
+                evolTime = int(seqId.split(":")[-1][2:]) + 1
+                seqDictCount[originalSeqId] += 1
+                # Obtain the basic information of the rearranged sequence
+                v, d, j, v3p, d5p, d3p, j5p, v3d, d5d, d3d, j5d, n1, n2, n1_seq, n2_seq, n1Start, dStart, n2Start, jStart, _, _, _ = seqId.split(":")
+                v3p, d5p, d3p, j5p, v3d, d5d, d3d, j5d, n1, n2, n1Start, dStart, n2Start, jStart = map(int, [v3p, d5p, d3p, j5p, 
+                                                                                                        v3d, d5d, d3d, j5d, 
+                                                                                                        n1, n2, 
+                                                                                                        n1Start, dStart, n2Start, jStart])
+                # Obtain the sequences for v/d/j segment from the rearranged sequence
+                v_seq = seq[:n1Start]
+                j_seq = seq[jStart:]
+                d_seq = seq[dStart:n2Start]
+
+                # Obtain the mutated sequences and mutation tag
+                v_mut_tag = v_mut_tag[:]
+                d_mut_tag = d_mut_tag[:]
+                j_mut_tag = j_mut_tag[:]
+                v_mut_tag, v_mut_seq = shm(v_seq, v, 0, n1Start, v_mut_tag, 0, df_mut, df_sub)
+                d_mut_tag, d_mut_seq = shm(d_seq, d, len_dict[d]-d5p+d5d, len_dict[d]*2+d5p-d5d, d_mut_tag, dStart-len_dict[d]-d5d+d5p, df_mut, df_sub)
+                j_mut_tag, j_mut_seq = shm(j_seq, j, 20-j5p+j5d, len_dict[j]+20, j_mut_tag, jStart-20-j5d+j5p, df_mut, df_sub)
+                
+                # 
+                seq_id = "%s:index_%d:T_%d"%(originalSeqId, seqDictCount[originalSeqId], evolTime)
+                mut_seq = "%s%s%s%s%s"%(v_mut_seq, n1_seq, d_mut_seq, n2_seq, j_mut_seq)
+                seqDict.update({seq_id:[mut_seq, [v_mut_tag, d_mut_tag, j_mut_tag]]})
+                nSeq += 1
+        nEvolTimes += 1
+    ## Write the evoluted sequences
+    for seqId, [seq, [v_mut_tag, d_mut_tag, j_mut_tag]] in seqDict.items():
+        mut_tag = v_mut_tag+d_mut_tag+j_mut_tag
+        mut_tag_sorted = sorted(mut_tag, key=lambda x:int(x[1:-1]))
+        fs.write(">%s:%s\n"%(seqId, "_".join(mut_tag_sorted)))
+        fs.write(seq+'\n')
+    fs.close()
+        
+    ## Import the input fasta file
+    seqDict = {}
+    for rec in SeqIO.parse(dirt+"/"+outs, "fasta"):
+        seqDict.update({str(rec.id):str(rec.seq)})
+    
+    ## Estimate the output size with the given power law parameters
+    nSeqInput = len(seqDict)
+    nSeqOutput = 0
+    for i in range(1, nSeqInput+1):
+        size = round(TOPNUM * 1/(i**1))  # calculate the size of ith sequences
+        size = size if size >= 1 else 1  # deal with 0 exceptions
+        nSeqOutput += size
+    
+    ## Report the model parameters and the number of input and output sequences
+    print ('''\n\nThe number of input sequences after SHM is %d
+Given the input model for generating clone size 
+(%f for alpha and %d for the number of top clone),
+the estimated number of resultant sequences is %d.\n'''%(nSeqInput, ALPHA, TOPNUM, nSeqOutput))
+    
+    ## Deal with the exceptions that the output sequence number is too large
+    if nSeqOutput > MAXNUM:
+        print ("The estimated number (%d) of output sequences is too large to output!"%nSeqOutput)
+        os._exit(0)
+    
+    ## Output the expanded sequences
+    seqOutLst = []
+    for i, [seqId, seq] in enumerate(seqDict.items()):
+        size = round(TOPNUM * 1/((i+1)**1))  # calculate the size of ith sequences
+        size = size if size >= 1 else 1  # deal with 0 exceptions
+        for i in range(int(size)):
+            mutTag = seqId.split(":")[-1]
+            pSeqId = ":".join(seqId.split(":")[:-1])
+            newSeqId = "%s:copy%d:%s"%(pSeqId, i, mutTag)
+            seqOutLst.append((newSeqId, seq))
+    shuffle(seqOutLst)  # shuffle the sequence list to obtain random ordered sequence
+    for i, (newSeqId, seq) in enumerate(seqOutLst):
+        if i%int(nSeqOutput/10) == 0:
+            print ("[%s] %d (%.2f%%) sequences have been written into the output"%(timenow(), i, float(i)/float(nSeqOutput)*100))
+        fc.write(">%s\n"%newSeqId)
+        fc.write("%s\n"%seq)
+    fc.close()
+    
+    # Prompt message
+    print ("\n[%s] shmsim finished!"%timenow())
+    print ("SHM sequences can be found in %s/%s"%(dirt.strip("/"), outs))
+    print ("Clonally expanded sequences can be found in %s/%s"%(dirt.strip("/"), outc))
+
+
+if __name__ == "__main__":
+    ## Specify the parameter directory
+    scriptDir = sys.path[0]
+    parDir = "%s/param_files"%scriptDir
+    
+    vRef = '%s/human_IGHV'%parDir; dRef = '%s/human_IGHD'%parDir; jRef = '%s/human_IGHJ'%parDir
+    vu_fl = '%s/vu.geno.00.txt'%parDir
+    du_fl = '%s/du.txt'%parDir
+    vGappedRef = '%s/IGHV.fasta'%parDir; dGappedRef = '%s/IGHD.gapped.fasta'%parDir
+    mDefault = "%s/mutability.model.txt"%parDir
+    sDefault = "%s/substitution"%parDir
+    iDefault = "raw_rearranged_sequences.fasta"
+    osDefault = "shm_harboring_sequences.fasta"
+    ocDefault = "clonally_expanded_sequences.fasta"
+    fDefault = 1.0
+    dtime = int(time.strftime("%Y%m%d", time.localtime()))
+    
+    ## define the argument parser module
+    parser = argparse.ArgumentParser(description='''shmsim simuates clonally
+    expanded sequences with phylogenetical SHM structure''')
+    ###################  parameters for SHM simulation ################### 
+    parser.add_argument("-m", "--mut", type=str, default=mDefault, \
+                help="Path to mutability model")
+    parser.add_argument("-p", "--sub", type=str, default=sDefault, \
+                help="Path to substitution model directory")
+    parser.add_argument("-f", "--mut_ability_fold", type=float, default=fDefault, \
+                help="Fold of mutability")
+    parser.add_argument("-T", "--times", type=int, default=8, \
+                help="Evolution times")
+    parser.add_argument("-pr", "--proportion", type=float, default=0.2, \
+                help="Proportion of sequences that undergo SHM in each evolution")
+    parser.add_argument("-ns", "--nseqs", type=int, default=50000, \
+                help="Maximum number of sequences after shm simulation")
+    parser.add_argument("-os", "--outputs", type=str, default=osDefault, \
+                help="Output fasta file of unique sequences after SHM simulation")
+    ###################  parameters for clonal expansion ################### 
+    parser.add_argument("-a", "--alpha", type=float, default=1.0, \
+                help="The alpha value of power law")
+    parser.add_argument("-t", "--topnum", type=int, default=5000, \
+                help="The number of top clone")
+    parser.add_argument("-ne", "--nmax", type=int, default=500000, \
+                help='''The maximum number of clonally expanded sequences. If the number 
+                of output sequences exceeds this number, this script will
+                automatically exit.''')
+    parser.add_argument("-oc", "--outputc", type=str, default=ocDefault, \
+                help="Output fasta file of clonally expanded sequences")
+    ################### general parameters ###################
+    parser.add_argument("-i", "--input", type=str, default=iDefault, \
+                help="Path to raw rearranged sequences")
+    parser.add_argument("-d", "--dir", type=str, default="./", \
+                help="Path to output directory")
+    parser.add_argument("-s", "--seed", type=int, default=dtime, \
+                help="Seed used for generating random value")
+    
+    # Obtain the passed-in parameters
+    args = parser.parse_args()
+    # general parameters
+    input_fasta = args.input
+    dirt = args.dir
+    seed_value = args.seed
+    # shm parameters
+    outs = args.outputs
+    mut_model_file = args.mut
+    shm_model_dir = args.sub
+    fold = args.mut_ability_fold
+    EVOL_TIMES = args.times
+    MAX_SEQ = args.nseqs
+    SHM_PROPORTION = args.proportion
+    # Obtain the passed-in parameters
+    outc = args.outputc
+    ALPHA = args.alpha
+    TOPNUM = int(args.topnum)
+    MAXNUM = args.nmax
+    
+    ## Set the random seed for obtaining the same results
+    seed(seed_value)
+    ## Write the results
+    fs = open(dirt+"/"+outs, 'w')
+    fc = open(dirt+"/"+outc, 'w')
+    
+    # Prompt message
+    print (''' +-++-++-++-++-++-+
+ |s||h||m||s||i||m|
+ +-++-++-++-++-++-+
+    ''')
+    print ("[%s] shmsim starting ...\n\n"%timenow())
+    print ("The parameters employed are as follows:\n")
+    print ("%40s\t%s"%("Parameter", "Value"))
+    print ("%40s\t%s"%("Path to mutability model", mut_model_file))
+    print ("%40s\t%s"%("Path to substitution model directory", shm_model_dir))
+    print ("%40s\t%.2f"%("Fold of mutability", fold))
+    print ("%40s\t%d"%("Evolution times", EVOL_TIMES))
+    print ("%40s\t%.2f"%("Proportion of SHM", SHM_PROPORTION))
+    print ("%40s\t%.2f"%("Alpha", ALPHA))
+    print ("%40s\t%d"%("Number of top clone", TOPNUM))
+    print ("%40s\t%d"%("Maximum number of sequences (SHM)", MAX_SEQ))
+    print ("%40s\t%d"%("Maximum number of sequences (expanded)", MAXNUM))
+    print ("%40s\t%s"%("Output directory", dirt))
+    print ("%40s\t%s"%("Output fasta file (SHM)", outs))
+    print ("%40s\t%s"%("Output fasta file (expanded)", outc))
+    print ("%40s\t%s\n\n"%("Seed", seed_value))
+    
+    ## Run main function
+    main()

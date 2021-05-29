@@ -1,0 +1,213 @@
+#!/bin/env python
+# -*- coding: utf-8 -*-
+
+
+'''
+    De novo simulation of antibody heavy chain repertoire dataset 
+    through repsim
+'''
+
+
+import subprocess
+import argparse
+import time
+import sys
+
+
+def main():
+    # Step 1: simulate independent rearranges via ramsim
+    ramsim_cmd = '''%s/ramsim \
+                    -vu %s -du %s -ju %s -vr %s -dr %s -jr %s \
+                    -v3d %s -d5d %s -d3d %s -j5d %s \
+                    -v3p %s -d5p %s -d3p %s -j5p %s \
+                    -n1 %s -n2 %s \
+                    -v3Odd %f -d5Odd %f -d3Odd %f -j5Odd %f \
+                    -n %d \
+                    -pp %f \
+                    -d %s \
+                    -o %s \
+                    -s %d'''%(scriptDir, vu, du, ju, vr, dr, jr, 
+                             v3d, d5d, d3d, j5d, 
+                             v3p, d5p, d3p, j5p, 
+                             n1, n2, 
+                             v3r, d5r, d3r, j5r, 
+                             N, pp, dirt, outr, seed_value)
+    subprocess.call(ramsim_cmd, shell=True)
+    print ("Step one Completed!")
+    
+    # Step 2: simulate clonally expanded sequences with 
+    #         phylogenetic SHMs via shmsim
+    
+    shmsim_cmd = '''%s/shmsim -m %s -p %s -f %s -T %d -pr %f -ns %d -os %s \
+                        -a %f -t %d -ne %d -oc %s -i %s -d %s -s %d'''%(scriptDir, mut_model_file,
+                    shm_model_dir, fold, EVOL_TIMES, SHM_PROPORTION, MAX_SEQ, outs,
+                    ALPHA, TOPNUM, MAXNUM, outc, outr, dirt, seed_value)
+    subprocess.call(shmsim_cmd, shell=True)
+    print ("Step two Completed!")
+
+    # Step 2: simulate next generation sequencing reads
+    #         via ngssim
+    ngssim_cmd = "%s/ngssim -art %s -i %s -d %s -b %s -s %d"%(scriptDir, art_path, outc, dirt, basename, seed_value)
+    subprocess.call(ngssim_cmd, shell=True)
+    print ("Step three Completed!")
+
+
+if __name__ == "__main__":
+    ## Specify the default value
+    scriptDir = sys.path[0]
+    parDir = "%s/param_files"%scriptDir
+    # ramsim defaults
+    vRefDefault = '%s/human_IGHV'%parDir
+    dRefDefault = '%s/human_IGHD'%parDir
+    jRefDefault = '%s/human_IGHJ'%parDir
+    vDefault = '%s/vu.geno.05.txt'%parDir
+    dDefault = '%s/du.txt'%parDir
+    jDefault = '%s/ju.add.loci.txt'%parDir
+    v3dDefault = '%s/V3D.txt'%parDir
+    d5dDefault = '%s/D5D.txt'%parDir
+    d3dDefault = '%s/D3D.txt'%parDir
+    j5dDefault = '%s/J5D.txt'%parDir
+    v3pDefault = '%s/V3P.txt'%parDir
+    d5pDefault = '%s/D5P.txt'%parDir
+    d3pDefault = '%s/D3P.txt'%parDir
+    j5pDefault = '%s/J5P.txt'%parDir
+    n1Default = '%s/N1.txt'%parDir
+    n2Default = '%s/N2.txt'%parDir
+    # shmsim defaults
+    vGappedRef = '%s/IGHV.fasta'%parDir
+    dGappedRef = '%s/IGHD.gapped.fasta'%parDir
+    mDefault = "%s/mutability.model.txt"%parDir
+    sDefault = "%s/substitution"%parDir
+    fDefault = 1.0
+    # ngssim defaults
+    artDefault="art_illumina"
+    # general defaults including outputs and inputs
+    orDefault = "raw_rearranged_sequences.fasta"
+    osDefault = "shm_harboring_sequences.fasta"
+    ocDefault = "clonally_expanded_sequences.fasta"
+    bnDefault = "illumina.sequencing.reads"
+    outDirDefault = "./"
+    dtime = int(time.strftime("%Y%m%d", time.localtime()))
+    
+    ## Argparser module settings
+    parser = argparse.ArgumentParser(description='''repsim de novo 
+    simulates antibody heavy chain repertoire dataset.''')
+    # ramsim
+    parser.add_argument("-vu", "--v_usage_file", type=str, default=vDefault, \
+                help="Path to V allele usage statistics")
+    parser.add_argument("-du", "--d_usage_file", type=str, default=dDefault, \
+                help="Path to D allele usage statistics")
+    parser.add_argument("-ju", "--j_usage_file", type=str, default=jDefault, \
+                help="Path to J allele usage statistics")
+    parser.add_argument("-vr", "--v_reference", type=str, default=vRefDefault, \
+                help="Path to V allele reference sequence")
+    parser.add_argument("-dr", "--d_reference", type=str, default=dRefDefault, \
+                help="Path to D allele reference sequence")
+    parser.add_argument("-jr", "--j_reference", type=str, default=jRefDefault, \
+                help="Path to J  allele reference sequence")
+    parser.add_argument("-v3d", "--V3D", type=str, default=v3dDefault, \
+                help="Path to junctional modification v3d statistics")
+    parser.add_argument("-d5d", "--D5D", type=str, default=d5dDefault, \
+                help="Path to junctional modification d5d statistics")
+    parser.add_argument("-d3d", "--D3D", type=str, default=d3dDefault, \
+                help="Path to junctional modification d3d statistics")
+    parser.add_argument("-j5d", "--J5D", type=str, default=j5dDefault, \
+                help="Path to junctional modification j5d statistics")
+    parser.add_argument("-v3p", "--V3P", type=str, default=v3pDefault, \
+                help="Path to junctional modification v3d statistics")
+    parser.add_argument("-d5p", "--D5P", type=str, default=d5pDefault, \
+                help="Path to junctional modification d5d statistics")
+    parser.add_argument("-d3p", "--D3P", type=str, default=d3pDefault, \
+                help="Path to junctional modification d3d statistics")
+    parser.add_argument("-j5p", "--J5P", type=str, default=j5pDefault, \
+                help="Path to junctional modification j5d statistics")
+    parser.add_argument("-n1", "--N1", type=str, default=n1Default, \
+                help="Path to junctional modification d3d statistics")
+    parser.add_argument("-n2", "--N2", type=str, default=n2Default, \
+                help="Path to junctional modification j5d statistics")
+    parser.add_argument("-v3Odd", "--V3ODD", type=float, default=0.561437, \
+                help="Ratio of deletion events in V3")
+    parser.add_argument("-d5Odd", "--D5ODD", type=float, default=0.828560, \
+                help="Ratio of deletion events in D5")
+    parser.add_argument("-d3Odd", "--D3ODD", type=float, default=0.816268, \
+                help="Ratio of deletion events in D3")
+    parser.add_argument("-j5Odd", "--J5ODD", type=float, default=0.817500, \
+                help="Ratio of deletion events in J5")
+    parser.add_argument("-n", "--n_rearrangements", type=int, default=5000, \
+                help="Number of independent rearrangements to be simulated")
+    parser.add_argument("-pp", "--pct_prod", type=float, default=100, \
+                help="Percentage of productive rearrangements")
+    # shmsim
+    ###################  parameters for SHM simulation ################### 
+    parser.add_argument("-m", "--mut", type=str, default=mDefault, \
+                help="Path to mutability model")
+    parser.add_argument("-p", "--sub", type=str, default=sDefault, \
+                help="Path to substitution model directory")
+    parser.add_argument("-f", "--mut_ability_fold", type=float, default=fDefault, \
+                help="Fold of mutability")
+    parser.add_argument("-T", "--times", type=int, default=8, \
+                help="Evolution times")
+    parser.add_argument("-pr", "--proportion", type=float, default=0.2, \
+                help="Proportion of sequences that undergo SHM in each evolution")
+    parser.add_argument("-ns", "--nseqs", type=int, default=50000, \
+                help="Maximum number of sequences after shm simulation")
+    ###################  parameters for clonal expansion ################### 
+    parser.add_argument("-a", "--alpha", type=float, default=1.0, \
+                help="The alpha value of power law")
+    parser.add_argument("-t", "--topnum", type=int, default=5000, \
+                help="The number of top clone")
+    parser.add_argument("-ne", "--nmax", type=int, default=500000, \
+                help='''The maximum number of clonally expanded sequences. If the number 
+                of output sequences exceeds this number, this script will
+                automatically exit.''')
+    # ngssim
+    parser.add_argument("-art", "--art_path", type=str, default=artDefault, \
+                help="Path to ART executable")
+    # general
+    parser.add_argument("-d", "--dir", type=str, default=outDirDefault, \
+                help="Path to the output directory")
+    parser.add_argument("-s", "--seed", type=int, default=dtime, \
+                help="Seed used for generating random values")
+    parser.add_argument("-or", "--outputr", type=str, default=orDefault, \
+                help="Output fasta file of independent rearranged sequences")
+    parser.add_argument("-os", "--outputs", type=str, default=osDefault, \
+                help="Output fasta file of unique sequences after SHM simulation")
+    parser.add_argument("-oc", "--outputc", type=str, default=ocDefault, \
+                help="Output fasta file of clonally expanded sequences")
+    parser.add_argument("-b", "--basename", type=str, default=bnDefault, \
+                help="Basename for output ngs reads file")
+    
+    
+    ## Parse arguments
+    args = parser.parse_args()
+    # ramsim
+    vu = args.v_usage_file; du = args.d_usage_file; ju = args.j_usage_file
+    vr = args.v_reference; dr = args.d_reference; jr = args.j_reference
+    v3p = args.V3P; d5p = args.D5P; d3p = args.D3P; j5p = args.J5P
+    v3d = args.V3D; d5d = args.D5D; d3d = args.D3D; j5d = args.J5D
+    n1 = args.N1; n2 = args.N2
+    v3r = args.V3ODD; d5r = args.D5ODD; d3r = args.D3ODD; j5r = args.J5ODD
+    pp = args.pct_prod
+    N = args.n_rearrangements
+    # shmsim
+    mut_model_file = args.mut
+    shm_model_dir = args.sub
+    fold = args.mut_ability_fold
+    EVOL_TIMES = args.times
+    MAX_SEQ = args.nseqs
+    SHM_PROPORTION = args.proportion
+    ALPHA = args.alpha
+    TOPNUM = int(args.topnum)
+    MAXNUM = args.nmax
+    # ngssim
+    art_path = args.art_path
+    # general
+    dirt = args.dir
+    seed_value = args.seed
+    outr = args.outputr
+    outs = args.outputs
+    outc = args.outputc
+    basename = args.basename
+    
+    ## run the main function
+    main()

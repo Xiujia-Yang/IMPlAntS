@@ -1,0 +1,70 @@
+#!/bin/env python
+# -*- coding: utf-8 -*-
+
+
+'''
+    IMPlAnts, (Integrated and Modular Pipeline for Antibody 
+    Repertoire Simulation) simulates antibody heavy chain 
+    repertoire sequencing dataset according to serveral key
+    features learned from a collection of 2152 high-quality 
+    Ig-seq dataset (refer to 
+    https://doi.org/10.1101/814590). These features consist
+    of germline gene usage, junctional modification, 
+    position-specific somatic hypermutation and clonal 
+    expansion.
+    
+    Written by Xiujia Yang, on May 6th, 2020
+'''
+
+
+import sys
+import subprocess
+
+def main():
+    # Define the subcommand list
+    VALID_SUBCOMMAND_LST = ["ramsim", "shmsim", "ngssim", "repsim"]
+        
+    # Determine if the command line parameter conforms to
+    # guidelines
+    if len(sys.argv) > 1:
+        subcommand = sys.argv[1]
+    if len(sys.argv) == 1 or subcommand == "-h":
+        print (help_message)
+    elif subcommand != "-h" and subcommand not in VALID_SUBCOMMAND_LST:
+        print (help_message)
+        print ("Caution! \"%s\" is not a valid subcommmand, %s"%(subcommand, error_message))
+    elif subcommand in VALID_SUBCOMMAND_LST:
+        if len(sys.argv) > 2:  # is parameters provided
+            argvs = sys.argv[2:]
+            parameter_str = " ".join(argvs)
+        else:
+            parameter_str = ""
+        subprocess.call("%s %s"%(subcommand, parameter_str), shell=True)
+    
+        
+if __name__ == "__main__":
+    help_message = r'''
+.___    _____  __________ .__      _____            __    _________
+|   |  /     \ \______   \|  |    /  _  \    ____ _/  |_ /   _____/
+|   | /  \ /  \ |     ___/|  |   /  /_\  \  /    \\   __\\_____  \ 
+|   |/    Y    \|    |    |  |__/    |    \|   |  \|  |  /        \
+|___|\____|__  /|____|    |____/\____|__  /|___|  /|__| /_______  /
+             \/                         \/      \/              \/ 
+IMPlAnts (Integrated and Modular Pipeline for Antibody Repertoire 
+Simulation) simulates antibody heavy chain repertoire sequencing dataset 
+according to serveral key features learned from a collection of 2152 
+high-quality Ig-seq dataset.
+
+Subcommands:
+    ramsim    Simulate independent rearranged V(D)J sequences
+    shmsim    Simulate clonally expanded sequences with phylogenetic SHMs
+    ngssim    Simulate NGS reads via ART
+    repsim    De novel simulate antibody heavy chain repertoire dataset
+
+Other:
+    -h        Print this message
+        '''
+    error_message = '''
+please retry with the subcommands provided above.
+    '''
+    main()
