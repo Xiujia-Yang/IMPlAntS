@@ -28,7 +28,7 @@ export PATH=/path/to/IMPlAntS-main:$PATH
 
 
 ## Schematic diagram
-![pipeline](image/pipeline.png)
+![pipeline](image/pipeline2.png)
 
 
 ## Simulation pipeline
