@@ -24,6 +24,7 @@ In Linux OS, users can add the main directory into the environment variable, `PA
 
 ```
 export PATH=/path/to/IMPlAntS-main:$PATH
+chmod +x implants ramsim shmsim ngssim repsim
 ```
 
 
@@ -58,7 +59,7 @@ Other:
 
 
 ### One-stop simulation
-You can use IMPlAntS to simulate antibody repertoire sequencing dataset simply via a single subcommand, `repsim`. All key parameters are set by default, so you can test this pipeline without specifying any parameters by executing the following command,
+You can use IMPlAntS to simulate antibody repertoire sequencing dataset simply via a single subcommand, `repsim`. All key parameters are set by default, so you can test this pipeline without specifying any parameter by executing the following command,
 
 `implants repsim`
 
