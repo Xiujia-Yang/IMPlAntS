@@ -7,7 +7,6 @@ import argparse
 import pandas as pd
 from Bio import SeqIO
 from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
 import argparse
 from random import random
 from random import randint
@@ -45,9 +44,9 @@ def seq_mod(freq_dict, seq, flag, end):
         return [seq, 0, 0]
     else:
         if end == 3:
-            return [seq[:-l], 0, l] if flag == '-' else [seq+str(Seq(seq[-l:], generic_dna).reverse_complement()), l, 0]
+            return [seq[:-l], 0, l] if flag == '-' else [seq+str(Seq(seq[-l:]).reverse_complement()), l, 0]
         else:
-            return [seq[l:], 0, l] if flag == '-' else [str(Seq(seq[:l], generic_dna).reverse_complement())+seq, l, 0]
+            return [seq[l:], 0, l] if flag == '-' else [str(Seq(seq[:l]).reverse_complement())+seq, l, 0]
 
 def N_seq(freq_dict):
     '''
@@ -79,9 +78,9 @@ def status(seq, vloci, jloci, jpos, j5dLen):
     jOffset = jpos%3
     endOffset = len(seq[vOffset:])%3
     if endOffset != 0:
-        aaSeq = Seq(seq[vOffset:-endOffset], generic_dna).translate()
+        aaSeq = Seq(seq[vOffset:-endOffset]).translate()
     else:
-        aaSeq = Seq(seq[vOffset:], generic_dna).translate()
+        aaSeq = Seq(seq[vOffset:]).translate()
     if "*" not in aaSeq and aaSeq[int(vloci/3)] == "C" and j5dLen < jloci-2 and vOffset == jOffset:
         return "Productive"
     else:
