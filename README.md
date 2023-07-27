@@ -23,7 +23,7 @@
 In Linux OS, users can add the main directory into the environment variable, `PATH`, to enable free calling **IMPlAntS** utilities. The following is an example.
 
 ```
-export PATH=/path/to/IMPlAntS-main:$PATH
+export PATH=/path/to/IMPlAntS:$PATH
 chmod +x implants ramsim shmsim ngssim repsim
 ```
 
