@@ -24,7 +24,7 @@ In Linux OS, users can add the main directory into the environment variable, `PA
 
 ```
 export PATH=/path/to/IMPlAntS:$PATH
-chmod +x implants ramsim shmsim ngssim repsim
+chmod +x implants ramsim shmsim ngssim repsim art_illumina
 ```
 
 
