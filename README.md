@@ -210,7 +210,7 @@ optional arguments:
   -s SEED, --seed SEED  Seed used for generating random values
 ```
 
-The following schematic provides the semantic content of the description line of each rearranged sequence
+The following schematic provides the semantic content of the description line for each rearranged sequence
 ![semantic](semantic.png)
 
 
