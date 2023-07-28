@@ -210,6 +210,10 @@ optional arguments:
   -s SEED, --seed SEED  Seed used for generating random values
 ```
 
+The following schematic provides the semantic content of the description line of each rearranged sequence
+![semantic](semantic.png)
+
+
 #### SHM and clonal expansion simulation
 The second step is the individual rearrangement simulation. You can implement this step simply through `implant shmsim`. All optional parameters can be found by invoking `implant shmsim -h`.
 
